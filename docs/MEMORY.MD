@@ -83,3 +83,29 @@ distinguish market regimes.
 Propose "regime-aware loss" as future work. The volatility-adaptive λ heuristic
 works for trending markets; mean-reverting markets require a different penalty
 structure incorporating autocorrelation.
+## Regime Characterization (Final Boundary Condition Analysis)
+
+### Metrics per market
+| Market | Avg Vol | Autocorr(1) | Sign Persist | AVP-Loss Result |
+|---|---|---|---|---|
+| NIFTY 50 | 14.25% | -0.0066 | 0.5450 | ✅ Works |
+| S&P 500 | 14.61% | -0.1406 | 0.4748 | ✅ Works |
+| FTSE 100 | 13.84% | -0.0141 | 0.4994 | ❌ Fails |
+
+### Key insight
+The framework works when the market has DIRECTIONAL PREDICTABILITY
+(sign persistence ≠ 0.5), regardless of whether that predictability is
+trending (NIFTY: 0.545) or mean-reverting (S&P: 0.475).
+
+FTSE 100 (sign persist = 0.4994) is essentially a random walk. There is no
+exploitable pattern for the model to learn. Any asymmetric penalty adds
+noise on top of noise.
+
+### Boundary condition (for paper)
+The AVP-Loss requires sign persistence ≠ 0.5. This is a testable
+precondition that can be computed in one line before training.
+
+### Adaptive λ formula status
+- Works for trending and mean-reverting markets
+- Fails for random-walk markets
+- Formula: λ_market = λ_ref × (σ_ref / σ_market)
