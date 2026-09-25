@@ -1,0 +1,5 @@
+step,features,n,rmse,mdd,sortino,removed
+0,Log_Return_1d+Log_Return_5d+RSI+Volatility+Vol_Ratio+Return_20d+HL_Range+MA_Gap,8,0.012970244144352263,-0.16929627024393648,1.811382638389311,
+1,Log_Return_5d+RSI+Volatility+Vol_Ratio+Return_20d+HL_Range+MA_Gap,7,0.013014280030869187,-0.4059487018577112,0.6054771409495454,Log_Return_1d
+2,Log_Return_5d+Volatility+Vol_Ratio+Return_20d+HL_Range+MA_Gap,6,0.013113528841796137,-0.4059487018577112,0.6728164563260718,RSI
+3,Log_Return_5d+Volatility+Vol_Ratio+Return_20d+MA_Gap,5,0.013020971779323659,-0.4159446581777732,0.43004907855295404,HL_Range

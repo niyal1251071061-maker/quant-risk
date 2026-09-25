@@ -109,3 +109,17 @@ precondition that can be computed in one line before training.
 - Works for trending and mean-reverting markets
 - Fails for random-walk markets
 - Formula: λ_market = λ_ref × (σ_ref / σ_market)
+
+## Ablation Study (NIFTY 50, depth=6, λ=0.5)
+
+### Feature importance ranking (by MDD contribution)
+1. [Top feature] — importance score X
+2. [Second] — importance score Y
+3. [Third] — importance score Z
+...
+8. [Least important] — importance score W
+
+### Key findings
+- [Summary of which features matter]
+- [Whether the model can be simplified]
+- [Confirms/refutes the volatility-penalty hypothesis]
