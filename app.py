@@ -3,11 +3,7 @@ import pandas as pd
 import numpy as np
 import plotly.graph_objects as go
 
-st.set_page_config(
-    page_title="Quantitative Risk Mitigation",
-    page_icon="📈",
-    layout="wide"
-)
+st.set_page_config(page_title="Quantitative Risk Mitigation", page_icon="📈", layout="wide")
 
 # ---------- Metric Functions ----------
 def mdd(r):
@@ -42,7 +38,6 @@ try:
     base, cust = load_data(ticker_key)
 except FileNotFoundError as e:
     st.error(f"Missing data for {ticker_label}: {e}")
-    st.info("Run: python scripts/12_final.py")
     st.stop()
 
 base['Signal'] = (base['Pred'] > 0).astype(int)
@@ -69,19 +64,18 @@ st.sidebar.markdown(f"""
 Custom Asymmetric Volatility-Penalized Loss (AVP-Loss) for XGBoost
 
 **Method:**  
-- Walk-forward validation (5-yr train, 1-yr test)
-- 8 engineered features
-- Cross-market tested on NIFTY 50, S&P 500, FTSE 100
+- Walk-forward validation (5-yr train, 1-yr test)  
+- 8 engineered features  
+- Cross-market tested on NIFTY 50, S&P 500, FTSE 100  
 
 **{ticker_label} Results:**  
 - MDD improved **{mdd_imp:+.1f}%**  
 - Sortino improved **{sort_imp:+.1f}%**  
 - Sharpe improved **{sharpe_imp:+.1f}%**  
-- RMSE improved **{rmse_imp:+.1f}%**
+- RMSE improved **{rmse_imp:+.1f}%**  
 
 **Stack:** Python, XGBoost, Pandas, Streamlit, Plotly
 """)
-
 st.sidebar.divider()
 st.sidebar.warning("⚠ Analytical decision-support tool only. Not financial advice.")
 
@@ -99,28 +93,19 @@ c5.metric("RMSE", f"{rmse_fn(cust['Actual'], cust['Pred']):.6f}", delta=f"{rmse_
 
 st.divider()
 
-# ---------- Cumulative Returns ----------
+# ---------- Charts ----------
 st.subheader("Cumulative Strategy Returns")
 fig = go.Figure()
-fig.add_trace(go.Scatter(
-    x=base['Date'], y=base['Cumulative'],
-    name='Baseline MSE', line=dict(color='#8888ff', width=2)
-))
-fig.add_trace(go.Scatter(
-    x=cust['Date'], y=cust['Cumulative'],
-    name='Custom AVP-Loss', line=dict(color='#00C853', width=2)
-))
-fig.update_layout(
-    height=450,
-    hovermode='x unified',
-    legend=dict(orientation='h', yanchor='bottom', y=1.02),
-    margin=dict(l=20, r=20, t=40, b=20),
-    xaxis_title='Trading Date',
-    yaxis_title='Cumulative Return'
-)
+fig.add_trace(go.Scatter(x=base['Date'], y=base['Cumulative'],
+                         name='Baseline MSE', line=dict(color='#8888ff', width=2)))
+fig.add_trace(go.Scatter(x=cust['Date'], y=cust['Cumulative'],
+                         name='Custom AVP-Loss', line=dict(color='#00C853', width=2)))
+fig.update_layout(height=450, hovermode='x unified',
+                  legend=dict(orientation='h', yanchor='bottom', y=1.02),
+                  margin=dict(l=20, r=20, t=40, b=20),
+                  xaxis_title='Trading Date', yaxis_title='Cumulative Return')
 st.plotly_chart(fig, use_container_width=True)
 
-# ---------- Drawdown Chart ----------
 st.subheader("Drawdown Comparison")
 base_dd = (base['Cumulative'] - base['Cumulative'].cummax()) / base['Cumulative'].cummax()
 cust_dd = (cust['Cumulative'] - cust['Cumulative'].cummax()) / cust['Cumulative'].cummax()
@@ -129,15 +114,34 @@ fig2.add_trace(go.Scatter(x=base['Date'], y=base_dd, name='Baseline',
                           fill='tozeroy', line=dict(color='#8888ff')))
 fig2.add_trace(go.Scatter(x=cust['Date'], y=cust_dd, name='Custom AVP',
                           fill='tozeroy', line=dict(color='#00C853')))
-fig2.update_layout(
-    height=350,
-    hovermode='x unified',
-    yaxis_tickformat='.1%',
-    margin=dict(l=20, r=20, t=20, b=20),
-    xaxis_title='Trading Date',
-    yaxis_title='Drawdown'
-)
+fig2.update_layout(height=350, hovermode='x unified', yaxis_tickformat='.1%',
+                   margin=dict(l=20, r=20, t=20, b=20),
+                   xaxis_title='Trading Date', yaxis_title='Drawdown')
 st.plotly_chart(fig2, use_container_width=True)
+
+# ---------- Crisis Analysis ----------
+st.divider()
+st.subheader("Crisis Period Analysis")
+try:
+    crisis = pd.read_csv('reports/crisis/crisis_analysis.csv')
+    crisis_market = crisis[crisis['market'] == ticker_key]
+    for _, row in crisis_market.iterrows():
+        col_a, col_b, col_c, col_d = st.columns(4)
+        col_a.metric(row['crisis'], f"{row['custom_mdd']:.2%}",
+                     delta=f"{row['mdd_improvement_pct']:+.1f}%")
+        col_b.metric("Baseline MDD", f"{row['baseline_mdd']:.2%}")
+        col_c.metric("Custom Sortino", f"{row['custom_sortino']:.3f}")
+        col_d.metric("Baseline Sortino", f"{row['baseline_sortino']:.3f}")
+except FileNotFoundError:
+    st.info("Run scripts/40_crisis.py to generate crisis data.")
+
+# ---------- Classification ----------
+st.divider()
+st.subheader("Direction Classification")
+try:
+    cls = pd.read_csv('reports/classification_grid/final_summary.json')  # optional
+except Exception:
+    st.info("Classification results available in reports/classification_grid/")
 
 st.divider()
 st.caption("Built with Streamlit + Plotly | Data: Yahoo Finance daily OHLCV")
