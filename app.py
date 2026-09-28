@@ -89,12 +89,13 @@ st.sidebar.warning("⚠ Analytical decision-support tool only. Not financial adv
 st.title("Quantitative Risk Mitigation Dashboard")
 st.caption(f"Custom AVP-Loss vs Symmetric MSE Baseline — {ticker_label}, 2019–2023")
 
-# ---------- KPI Cards ----------
-c1, c2, c3, c4 = st.columns(4)
+# ---------- KPI Cards (5 columns) ----------
+c1, c2, c3, c4, c5 = st.columns(5)
 c1.metric("Baseline MDD", f"{mdd(base['Strategy']):.2%}")
 c2.metric("Custom MDD", f"{mdd(cust['Strategy']):.2%}", delta=f"{mdd_imp:+.1f}%")
 c3.metric("Custom Sortino", f"{sortino(cust['Strategy']):.3f}", delta=f"{sort_imp:+.1f}%")
-c4.metric("RMSE", f"{rmse_fn(cust['Actual'], cust['Pred']):.6f}", delta=f"{rmse_imp:+.1f}%")
+c4.metric("Custom Sharpe", f"{sharpe(cust['Strategy']):.3f}", delta=f"{sharpe_imp:+.1f}%")
+c5.metric("RMSE", f"{rmse_fn(cust['Actual'], cust['Pred']):.6f}", delta=f"{rmse_imp:+.1f}%")
 
 st.divider()
 
