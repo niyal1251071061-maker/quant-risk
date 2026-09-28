@@ -134,14 +134,20 @@ try:
         col_d.metric("Baseline Sortino", f"{row['baseline_sortino']:.3f}")
 except FileNotFoundError:
     st.info("Run scripts/40_crisis.py to generate crisis data.")
-
 # ---------- Classification ----------
 st.divider()
-st.subheader("Direction Classification")
-try:
-    cls = pd.read_csv('reports/classification_grid/final_summary.json')  # optional
-except Exception:
-    st.info("Classification results available in reports/classification_grid/")
+st.subheader("Direction Classification (Binary: Up/Down Prediction)")
+st.caption("Volatility-adjusted threshold applied on standard logistic classifier.")
 
-st.divider()
-st.caption("Built with Streamlit + Plotly | Data: Yahoo Finance daily OHLCV")
+CLASS_RESULTS = {
+    'NIFTY50': {'auc': 0.5680, 'bal_acc': 0.5728, 'beta': 0.1, 'base_thr': 0.52},
+    'SP500':   {'auc': 0.5189, 'bal_acc': 0.5371, 'beta': 1.0, 'base_thr': 0.55},
+}
+
+cr = CLASS_RESULTS[ticker_key]
+c1, c2, c3 = st.columns(3)
+c1.metric("AUC", f"{cr['auc']:.4f}")
+c2.metric("Balanced Accuracy", f"{cr['bal_acc']:.4f}")
+c3.metric("Threshold β", f"{cr['beta']:.2f}")
+
+st.caption(f"Optimal config: base_threshold={cr['base_thr']:.2f}, vol_adjustment_β={cr['beta']:.2f}")
