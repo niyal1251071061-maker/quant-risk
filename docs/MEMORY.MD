@@ -181,3 +181,26 @@ NIFTY responds strongly; S&P weakly.
 - reports/classification_grid/SP500_stage1.csv
 - reports/classification_grid/SP500_stage2.csv
 - reports/classification_grid/final_summary.json
+## Multi-Seed Robustness (Level 3.6)
+
+Zero variance across 5 seeds (0, 42, 123, 456, 789).
+Reason: XGBoost deterministic tree building with exact splits.
+Result: Fully reproducible.
+
+## Crisis Period Analysis (Level 3.5)
+
+### NIFTY 50
+- COVID-2020 (77 days):  MDD -31.83% → -15.30% (+51.9% improvement)
+- 2022 rate hikes (205 days): MDD -19.45% → -11.84% (+39.2% improvement)
+
+### S&P 500
+- COVID-2020 (82 days):  MDD -31.69% → -28.09% (+11.4% improvement)
+- 2022 rate hikes (209 days): MDD -22.00% → -15.66% (+28.8% improvement)
+
+### Key finding: Sortino during crises
+- NIFTY COVID:    Baseline -0.52 → Custom +1.54
+- NIFTY 2022:     Baseline -0.35 → Custom +2.06
+- S&P COVID:      Baseline -0.59 → Custom +0.15
+- S&P 2022:       Baseline -0.84 → Custom -0.44
+
+**Custom model produces POSITIVE risk-adjusted returns during 3 of 4 crisis windows where baseline is deeply negative.**
