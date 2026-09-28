@@ -123,3 +123,16 @@ precondition that can be computed in one line before training.
 - [Summary of which features matter]
 - [Whether the model can be simplified]
 - [Confirms/refutes the volatility-penalty hypothesis]
+
+## Feature Selection (Corrected)
+
+### NIFTY 50
+- All 8 features contribute positively
+- Removing any single feature degrades score
+- **FINAL: 8 features**
+
+### S&P 500
+- RSI removal marginally improves composite score (Sortino 0.32→0.63)
+- But MDD slightly worse (-0.2809 → -0.2875)
+- Note: analysis ran at depth=6, not optimal depth=8
+- **FINAL: Use 8 features for consistency with NIFTY, paper simplicity**
