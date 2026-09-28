@@ -153,4 +153,31 @@ precondition that can be computed in one line before training.
 - NIFTY uses short-term features; S&P uses 20-day momentum
 - RSI is bottom-2 in both → redundant
 - Confirms volatility-driven nature of the loss
-- Figures saved: reports/shap/*.png
+- Figures saved: reports/shap/*.
+## Classification Grid Search — FINAL RESULTS (Level 3.3)
+
+### NIFTY 50
+- Best AUC: 0.5680
+- Best config: max_depth=5, lr=0.03, n_estimators=200, min_child_weight=5, subsample=1.0
+- Best threshold: β=0.1, base_thr=0.52
+- Balanced Accuracy: 0.5728
+- **Verdict: PUBLISHABLE (AUC > 0.55, BalAcc > 0.55)**
+
+### S&P 500
+- Best AUC: 0.5189
+- Best config: max_depth=7, lr=0.1, n_estimators=200, min_child_weight=5, subsample=1.0
+- Best threshold: β=1.0, base_thr=0.55
+- Balanced Accuracy: 0.5371
+- **Verdict: WEAK BUT POSITIVE**
+
+### Key insight
+The AVP-Loss principle transfers to classification as a DECISION-BOUNDARY
+adjustment (vol-adjusted threshold), not as a loss-function modification.
+NIFTY responds strongly; S&P weakly.
+
+### Files
+- reports/classification_grid/NIFTY50_stage1.csv
+- reports/classification_grid/NIFTY50_stage2.csv
+- reports/classification_grid/SP500_stage1.csv
+- reports/classification_grid/SP500_stage2.csv
+- reports/classification_grid/final_summary.json
