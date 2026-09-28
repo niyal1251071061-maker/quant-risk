@@ -1,0 +1,3 @@
+step,features,n,rmse,mdd,sortino,score,removed
+0,Log_Return_1d+Log_Return_5d+RSI+Volatility+Vol_Ratio+Return_20d+HL_Range+MA_Gap,8,0.014640822083215668,-0.28085043812701643,0.3199521341852717,-24.885522470848926,
+1,Log_Return_1d+Log_Return_5d+Volatility+Vol_Ratio+Return_20d+HL_Range+MA_Gap,7,0.014844836795913334,-0.28748951163851366,0.6268534551908115,-22.48041661194325,RSI
