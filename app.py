@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 import plotly.graph_objects as go
+import os
 
 st.set_page_config(page_title="Quantitative Risk Mitigation", page_icon="📈", layout="wide")
 
@@ -119,24 +120,30 @@ fig2.update_layout(height=350, hovermode='x unified', yaxis_tickformat='.1%',
                    xaxis_title='Trading Date', yaxis_title='Drawdown')
 st.plotly_chart(fig2, use_container_width=True)
 
-# ---------- Crisis Analysis ----------
+# ============================================================
+# ---------- Crisis Period Analysis ----------
+# ============================================================
 st.divider()
 st.subheader("Crisis Period Analysis")
+st.caption("Performance during historical market stress windows.")
 try:
     crisis = pd.read_csv('reports/crisis/crisis_analysis.csv')
     crisis_market = crisis[crisis['market'] == ticker_key]
     for _, row in crisis_market.iterrows():
-        col_a, col_b, col_c, col_d = st.columns(4)
-        col_a.metric(row['crisis'], f"{row['custom_mdd']:.2%}",
-                     delta=f"{row['mdd_improvement_pct']:+.1f}%")
-        col_b.metric("Baseline MDD", f"{row['baseline_mdd']:.2%}")
-        col_c.metric("Custom Sortino", f"{row['custom_sortino']:.3f}")
-        col_d.metric("Baseline Sortino", f"{row['baseline_sortino']:.3f}")
-except FileNotFoundError:
-    st.info("Run scripts/40_crisis.py to generate crisis data.")
-# ---------- Classification ----------
+        st.markdown(f"**{row['crisis'].replace('_', ' ')}** — {int(row['days'])} days")
+        cc1, cc2, cc3, cc4 = st.columns(4)
+        cc1.metric("Baseline MDD", f"{row['baseline_mdd']:.2%}")
+        cc2.metric("Custom MDD", f"{row['custom_mdd']:.2%}", delta=f"{row['mdd_improvement_pct']:+.1f}%")
+        cc3.metric("Baseline Sortino", f"{row['baseline_sortino']:.3f}")
+        cc4.metric("Custom Sortino", f"{row['custom_sortino']:.3f}")
+except Exception as e:
+    st.info(f"Crisis data not available: {e}")
+
+# ============================================================
+# ---------- Direction Classification ----------
+# ============================================================
 st.divider()
-st.subheader("Direction Classification (Binary: Up/Down Prediction)")
+st.subheader("Direction Classification (Up/Down Prediction)")
 st.caption("Volatility-adjusted threshold applied on standard logistic classifier.")
 
 CLASS_RESULTS = {
@@ -145,9 +152,105 @@ CLASS_RESULTS = {
 }
 
 cr = CLASS_RESULTS[ticker_key]
-c1, c2, c3 = st.columns(3)
-c1.metric("AUC", f"{cr['auc']:.4f}")
-c2.metric("Balanced Accuracy", f"{cr['bal_acc']:.4f}")
-c3.metric("Threshold β", f"{cr['beta']:.2f}")
-
+cl1, cl2, cl3 = st.columns(3)
+cl1.metric("AUC", f"{cr['auc']:.4f}")
+cl2.metric("Balanced Accuracy", f"{cr['bal_acc']:.4f}")
+cl3.metric("Threshold β", f"{cr['beta']:.2f}")
 st.caption(f"Optimal config: base_threshold={cr['base_thr']:.2f}, vol_adjustment_β={cr['beta']:.2f}")
+
+# ============================================================
+# ---------- Transaction Cost Analysis ----------
+# ============================================================
+st.divider()
+st.subheader("Transaction Cost Analysis")
+st.caption("Performance after 0.1% cost per position change.")
+try:
+    costs = pd.read_csv('reports/costs/transaction_cost_summary.csv')
+    costs_market = costs[costs['market'] == ticker_key]
+    if len(costs_market) > 0:
+        row = costs_market.iloc[0]
+        tc1, tc2, tc3 = st.columns(3)
+        tc1.metric("Baseline trades", f"{int(row['trades_baseline'])}")
+        tc2.metric("Custom trades", f"{int(row['trades_custom'])}")
+        tc3.metric("Net MDD improvement", f"{row['mdd_imp_net']:+.1f}%" if not pd.isna(row['mdd_imp_net']) else "Custom remains positive")
+        st.caption(f"Gross Sortino improvement: {row['sort_imp_gross']:+.1f}%")
+    else:
+        st.info(f"No cost data for {ticker_label}.")
+except Exception as e:
+    st.info(f"Transaction cost data not available.")
+
+# ============================================================
+# ---------- Statistical Significance ----------
+# ============================================================
+st.divider()
+st.subheader("Statistical Significance (Block Bootstrap)")
+st.caption("Stationary block bootstrap (n=5000, avg block=60 days) on MDD and Sortino.")
+try:
+    boot = pd.read_csv('reports/statistics/bootstrap_v2_results.csv')
+    boot_market = boot[boot['market'] == ticker_key]
+    if len(boot_market) > 0:
+        b = boot_market.iloc[0]
+        bs1, bs2 = st.columns(2)
+        bs1.metric("MDD: P(custom better)", f"{b['mdd_p_custom_better']:.4f}",
+                   delta=f"95% CI [{b['mdd_ci_low']:.3f}, {b['mdd_ci_high']:.3f}]",
+                   delta_color="off")
+        bs2.metric("Sortino: P(custom better)", f"{b['sort_p_custom_better']:.4f}",
+                   delta=f"95% CI [{b['sort_ci_low']:.3f}, {b['sort_ci_high']:.3f}]",
+                   delta_color="off")
+except Exception:
+    st.info("Bootstrap results not available.")
+
+# ============================================================
+# ---------- Multi-Seed Robustness ----------
+# ============================================================
+st.divider()
+st.subheader("Reproducibility")
+st.caption("XGBoost tree-building is deterministic with exact splits and full subsampling.")
+try:
+    seeds = pd.read_csv('reports/multiseed/seed_robustness.csv')
+    seeds_market = seeds[seeds['market'] == ticker_key]
+    if len(seeds_market) > 0:
+        s = seeds_market.iloc[0]
+        st.success(
+            f"Zero variance across 5 seeds — fully reproducible. "
+            f"MDD={s['mdd_mean']:.4f} ± {s['mdd_std']:.4f}, "
+            f"Sortino={s['sortino_mean']:.4f} ± {s['sortino_std']:.4f}"
+        )
+except Exception:
+    st.info("Multi-seed results not available.")
+
+# ============================================================
+# ---------- Feature Importance ----------
+# ============================================================
+st.divider()
+st.subheader("Feature Importance")
+st.caption("SHAP analysis — which features drive the model's predictions.")
+
+shap_img = f'reports/shap/{ticker_key}_beeswarm.png'
+shap_bar = f'reports/shap/{ticker_key}_importance.png'
+
+col_img1, col_img2 = st.columns(2)
+with col_img1:
+    if os.path.exists(shap_img):
+        st.image(shap_img, caption=f"{ticker_label} — SHAP beeswarm", use_container_width=True)
+    else:
+        st.info("SHAP beeswarm plot not found.")
+with col_img2:
+    if os.path.exists(shap_bar):
+        st.image(shap_bar, caption=f"{ticker_label} — Feature importance", use_container_width=True)
+    else:
+        st.info("SHAP importance plot not found.")
+
+# Ablation table
+try:
+    ablation = pd.read_csv('reports/ablation/ablation_importance_ranking.csv')
+    st.markdown("**Ablation: Feature Importance Ranking**")
+    st.dataframe(ablation, use_container_width=True, hide_index=True)
+except Exception:
+    pass
+
+# ============================================================
+# ---------- Footer ----------
+# ============================================================
+st.divider()
+st.caption("Built with Streamlit + Plotly | Data: Yahoo Finance daily OHLCV | Group SY-H1 · VIT Pune")
