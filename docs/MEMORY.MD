@@ -136,3 +136,21 @@ precondition that can be computed in one line before training.
 - But MDD slightly worse (-0.2809 → -0.2875)
 - Note: analysis ran at depth=6, not optimal depth=8
 - **FINAL: Use 8 features for consistency with NIFTY, paper simplicity**
+## SHAP Explainability (Level 3.2)
+
+### NIFTY 50 (top 3)
+1. Log_Return_1d (0.001374)
+2. Volatility (0.001193)
+3. Vol_Ratio (0.001155)
+
+### S&P 500 (top 3)
+1. Return_20d (0.001607)
+2. Log_Return_5d (0.001130)
+3. Vol_Ratio (0.001121)
+
+### Key findings
+- Vol_Ratio is top-3 in BOTH markets → consistent volatility signal
+- NIFTY uses short-term features; S&P uses 20-day momentum
+- RSI is bottom-2 in both → redundant
+- Confirms volatility-driven nature of the loss
+- Figures saved: reports/shap/*.png
