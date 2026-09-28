@@ -1,0 +1,32 @@
+{
+  "NIFTY50": {
+    "best_config": {
+      "max_depth": 5,
+      "learning_rate": 0.03,
+      "n_estimators": 200,
+      "min_child_weight": 5,
+      "subsample": 1.0
+    },
+    "best_auc": 0.5679976621765613,
+    "best_thr_config": {
+      "beta": 0.1,
+      "base_thr": 0.52
+    },
+    "best_bal_acc": 0.572762766583438
+  },
+  "SP500": {
+    "best_config": {
+      "max_depth": 7,
+      "learning_rate": 0.1,
+      "n_estimators": 200,
+      "min_child_weight": 5,
+      "subsample": 1.0
+    },
+    "best_auc": 0.5188572196720792,
+    "best_thr_config": {
+      "beta": 1.0,
+      "base_thr": 0.55
+    },
+    "best_bal_acc": 0.5371134754296694
+  }
+}
