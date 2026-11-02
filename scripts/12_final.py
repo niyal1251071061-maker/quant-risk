@@ -1,23 +1,21 @@
-import pandas as pd
+import os
+
 import numpy as np
+import pandas as pd
 import xgboost as xgb
 from sklearn.metrics import mean_squared_error
 
-df = pd.read_parquet('data/nifty_features.parquet')
-
-# Feature engineering (matches 11_deeper.py)
-df['Vol_Ratio'] = df['Volatility'] / df['Volatility'].rolling(60).mean()
-df['Return_20d'] = np.log(df['Close'] / df['Close'].shift(20))
-df['HL_Range'] = (df['High'] - df['Low']) / df['Close']
-df['MA_Gap'] = (df['Close'] - df['Close'].rolling(20).mean()) / df['Close']
-df.dropna(inplace=True)
+os.makedirs('reports', exist_ok=True)
 
 features = ['Log_Return_1d', 'Log_Return_5d', 'RSI', 'Volatility',
             'Vol_Ratio', 'Return_20d', 'HL_Range', 'MA_Gap']
-train_window, test_window = 1260, 252
-inner_val = 126
-LAM = 0.75
-DEPTH = 6
+train_window, test_window, inner_val = 1260, 252, 126
+
+CONFIGS = {
+    'NIFTY50': {'depth': 6, 'lam': 2.0, 'lr': 0.05, 'reg': 1.0},
+    'SP500': {'depth': 4, 'lam': 0.1, 'lr': 0.1, 'reg': 0.5},
+}
+
 
 def make_obj(lam, sigma_train):
     def avp(preds, dtrain):
@@ -26,52 +24,70 @@ def make_obj(lam, sigma_train):
         return mult * (preds - y), mult
     return avp
 
-def mdd(r):
-    c = (1 + r).cumprod(); p = c.cummax()
-    return ((c - p) / p).min()
 
-def sortino(r):
-    d = r[r < 0]
-    return 0 if d.std() == 0 else r.mean() / d.std() * np.sqrt(252)
+def train_market(name, cfg):
+    print(f"\n{'=' * 64}\nTraining {name} | depth={cfg['depth']}, lambda={cfg['lam']}\n{'=' * 64}")
+    df = pd.read_parquet(f'data/{name}_features.parquet')
 
-# Baseline for comparison
-preds_b, acts_b, dates_b = [], [], []
-for i in range(train_window, len(df) - test_window, test_window):
-    tr = df.iloc[:i]; te = df.iloc[i:i+test_window]
-    dtr = xgb.DMatrix(tr[features], label=tr['Target'])
-    dte = xgb.DMatrix(te[features])
-    bst = xgb.train({'max_depth': 4, 'learning_rate': 0.05, 'base_score': 0.0},
-                    dtr, num_boost_round=100)
-    preds_b.extend(bst.predict(dte)); acts_b.extend(te['Target'].values); dates_b.extend(te.index)
+    preds_b, acts_b, dates_b = [], [], []
+    for i in range(train_window, len(df), test_window):
+        tr = df.iloc[:i]
+        te = df.iloc[i:min(i + test_window, len(df))]
+        if len(te) < 20:
+            break
+        dtr = xgb.DMatrix(tr[features], label=tr['Target'])
+        dte = xgb.DMatrix(te[features])
+        bst = xgb.train(
+            {'max_depth': 4, 'learning_rate': 0.05, 'base_score': 0.0},
+            dtr,
+            num_boost_round=100,
+        )
+        preds_b.extend(bst.predict(dte))
+        acts_b.extend(te['Target'].values)
+        dates_b.extend(te.index)
 
-rb = pd.DataFrame({'Date': dates_b, 'Actual': acts_b, 'Pred': preds_b})
-rb.to_csv('reports/baseline_results.csv', index=False)
-rb['Strategy'] = np.where(rb['Pred'] > 0, 1, 0) * rb['Actual']
-print(f"BASELINE | RMSE={np.sqrt(mean_squared_error(rb['Actual'], rb['Pred'])):.6f} | MDD={mdd(rb['Strategy']):.4f} | Sortino={sortino(rb['Strategy']):.4f}")
+    rb = pd.DataFrame({'Date': dates_b, 'Actual': acts_b, 'Pred': preds_b})
+    rb['Strategy'] = (rb['Pred'] > 0).astype(int) * rb['Actual']
+    rb.to_csv(f'reports/baseline_{name}.csv', index=False)
 
-# Winning custom model
-preds, acts, dates = [], [], []
-for i in range(train_window, len(df) - test_window, test_window):
-    tr = df.iloc[:i]; te = df.iloc[i:i+test_window]
-    tr_inner = tr.iloc[:-inner_val]
-    val_inner = tr.iloc[-inner_val:]
-    
-    dtr = xgb.DMatrix(tr_inner[features], label=tr_inner['Target'])
-    dval = xgb.DMatrix(val_inner[features], label=val_inner['Target'])
-    dte = xgb.DMatrix(te[features])
-    
-    params = {'max_depth': DEPTH, 'learning_rate': 0.05,
-              'base_score': 0.0, 'reg_lambda': 1.0}
-    bst = xgb.train(params, dtr, num_boost_round=500,
-                    obj=make_obj(LAM, tr_inner['Volatility'].values),
-                    evals=[(dval, 'val')],
-                    early_stopping_rounds=30,
-                    verbose_eval=False)
-    preds.extend(bst.predict(dte, iteration_range=(0, bst.best_iteration+1)))
-    acts.extend(te['Target'].values)
-    dates.extend(te.index)
+    preds, acts, dates = [], [], []
+    for i in range(train_window, len(df), test_window):
+        tr = df.iloc[:i]
+        te = df.iloc[i:min(i + test_window, len(df))]
+        if len(te) < 20:
+            break
+        tr_inner = tr.iloc[:-inner_val]
+        val_inner = tr.iloc[-inner_val:]
+        dtr = xgb.DMatrix(tr_inner[features], label=tr_inner['Target'])
+        dval = xgb.DMatrix(val_inner[features], label=val_inner['Target'])
+        dte = xgb.DMatrix(te[features])
+        bst = xgb.train(
+            {
+                'max_depth': cfg['depth'],
+                'learning_rate': cfg['lr'],
+                'base_score': 0.0,
+                'reg_lambda': cfg['reg'],
+            },
+            dtr,
+            num_boost_round=500,
+            obj=make_obj(cfg['lam'], tr_inner['Volatility'].values),
+            evals=[(dval, 'val')],
+            early_stopping_rounds=30,
+            verbose_eval=False,
+        )
+        best_it = bst.best_iteration + 1 if bst.best_iteration is not None else 500
+        preds.extend(bst.predict(dte, iteration_range=(0, best_it)))
+        acts.extend(te['Target'].values)
+        dates.extend(te.index)
 
-rc = pd.DataFrame({'Date': dates, 'Actual': acts, 'Pred': preds})
-rc.to_csv('reports/custom_results.csv', index=False)
-rc['Strategy'] = np.where(rc['Pred'] > 0, 1, 0) * rc['Actual']
-print(f"CUSTOM λ={LAM}, depth={DEPTH} | RMSE={np.sqrt(mean_squared_error(rc['Actual'], rc['Pred'])):.6f} | MDD={mdd(rc['Strategy']):.4f} | Sortino={sortino(rc['Strategy']):.4f}")
+    rc = pd.DataFrame({'Date': dates, 'Actual': acts, 'Pred': preds})
+    rc['Strategy'] = (rc['Pred'] > 0).astype(int) * rc['Actual']
+    rc.to_csv(f'reports/custom_{name}.csv', index=False)
+
+    print(f'Baseline rows: {len(rb)} | Custom rows: {len(rc)}')
+    print(f'Baseline RMSE: {np.sqrt(mean_squared_error(rb["Actual"], rb["Pred"])):.6f}')
+    print(f'Custom RMSE:   {np.sqrt(mean_squared_error(rc["Actual"], rc["Pred"])):.6f}')
+
+
+for name, cfg in CONFIGS.items():
+    train_market(name, cfg)

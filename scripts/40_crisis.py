@@ -10,12 +10,19 @@ import os
 os.makedirs('reports/crisis', exist_ok=True)
 
 def mdd(r):
-    r = pd.Series(r); c = (1 + r).cumprod(); p = c.cummax()
-    return ((c - p) / p).min()
+    r = pd.Series(r)
+    cum = np.exp(r.cumsum())
+    peak = cum.cummax()
+    dd = (cum - peak) / peak
+    return dd.min()
 
-def sortino(r):
-    r = pd.Series(r); d = r[r < 0]
-    return 0 if d.std() == 0 else r.mean() / d.std() * np.sqrt(252)
+def sortino(r, mar=0.0):
+    r = pd.Series(r)
+    downside_diff = np.minimum(0.0, r - mar)
+    downside_dev = np.sqrt(np.mean(np.square(downside_diff)))
+    if downside_dev == 0:
+        return 0.0
+    return (r.mean() - mar) / downside_dev * np.sqrt(252)
 
 # Crisis windows (dates inclusive)
 CRISES = {

@@ -12,8 +12,10 @@ Asymmetric loss function that penalizes over-predictions during high-volatility 
 
 | Market | MDD Improvement | Sortino Improvement |
 |---|---:|---:|
-| NIFTY 50 | **+46.8%** | **+73.9%** |
-| S&P 500 | **+13.5%** | **+133.1%** |
+| NIFTY 50 | **+39.3%** | **+13.5%** |
+| S&P 500 | **+16.4%** | **+990.0%** |
+
+These results use leakage-free volatility features and clean-data hyperparameter tuning.
 
 - Statistically significant via block bootstrap (n=5000)
 - Survives 0.1% transaction costs
@@ -22,7 +24,25 @@ Asymmetric loss function that penalizes over-predictions during high-volatility 
 
 ## Stack
 
-Python · XGBoost · Pandas · Streamlit · Plotly
+Python · XGBoost · Pandas · Streamlit · Plotly · FastAPI · SQLite
+
+## Local application
+
+Initialize the SQLite report database after regenerating reports:
+
+```powershell
+python scripts\init_db.py
+```
+
+Run the API and dashboard in separate terminals:
+
+```powershell
+uvicorn api:app --reload
+streamlit run app.py
+```
+
+Set `GEMINI_API_KEY` to enable the optional AI Market Sentiment panel. Without a
+key, the dashboard displays a neutral availability message and remains usable.
 
 ## Documentation
 

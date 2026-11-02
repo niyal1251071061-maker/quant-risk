@@ -14,13 +14,18 @@ COST_RATE = 0.001  # 0.1% per trade
 
 def mdd(r):
     r = pd.Series(r)
-    c = (1 + r).cumprod(); p = c.cummax()
-    return ((c - p) / p).min()
+    cum = np.exp(r.cumsum())
+    peak = cum.cummax()
+    dd = (cum - peak) / peak
+    return dd.min()
 
-def sortino(r):
+def sortino(r, mar=0.0):
     r = pd.Series(r)
-    d = r[r < 0]
-    return 0 if d.std() == 0 else r.mean() / d.std() * np.sqrt(252)
+    downside_diff = np.minimum(0.0, r - mar)
+    downside_dev = np.sqrt(np.mean(np.square(downside_diff)))
+    if downside_dev == 0:
+        return 0.0
+    return (r.mean() - mar) / downside_dev * np.sqrt(252)
 
 def mean_return(r):
     return np.mean(r)

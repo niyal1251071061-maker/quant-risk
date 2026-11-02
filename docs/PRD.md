@@ -1,7 +1,7 @@
-# Product Requirements Document (PRD)
+# QuantRisk AI — Product Requirements Document
 
 ## Product
-Quantitative Risk Mitigation Platform
+QuantRisk AI — Quantitative Risk Mitigation Platform
 
 ## Problem
 Standard machine learning models in finance use symmetric loss functions (like Mean Squared Error). During high-volatility market crashes, these models generate catastrophic false-positive "buy" signals, leading to severe capital drawdowns. There is no lightweight, mathematically robust loss function that dynamically penalizes optimistic predictions based on real-time market volatility.
@@ -26,15 +26,30 @@ Create a centralized analytics engine that reduces downside risk by applying a c
 - Custom AVP-Loss implementation.
 - Evaluation plots.
 
+## Product surfaces
+
+- FastAPI endpoints for typed metrics, predictions, and latest signals.
+- SQLite persistence for generated report data.
+- Streamlit institutional analytics dashboard.
+- Optional Gemini financial-news sentiment enrichment.
+
 ## Out of Scope (v1)
-- PostgreSQL & Redis (use Parquet/SQLite)
-- User Authentication
-- Live streaming data
-- News sentiment analysis
-- Mobile application
+
+- Trade execution or broker integration.
+- Portfolio management or investment advice.
+- User accounts, JWT authentication, and multi-tenant data.
+- Live streaming market data.
 
 ## Success Criteria
 1. Data cleaned and features engineered.
 2. Custom loss implemented in XGBoost.
 3. Walk-forward validation loop working.
 4. Maximum Drawdown (MDD) of custom model is lower than baseline MSE model.
+5. API and dashboard show the same leakage-free stored results.
+
+## Safety and quality constraints
+
+- Volatility must use only historical returns available at prediction time.
+- MDD compounds log returns exponentially.
+- Sortino uses whole-series downside semi-deviation.
+- Missing Gemini configuration must not prevent dashboard use.

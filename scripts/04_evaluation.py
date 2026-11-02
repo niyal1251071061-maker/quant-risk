@@ -4,43 +4,47 @@ import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 
-base = pd.read_csv('reports/baseline_results.csv')
-cust = pd.read_csv('reports/custom_results.csv')
-
 def mdd(returns):
-    cum = (1 + returns).cumprod()
+    returns = pd.Series(returns)
+    cum = np.exp(returns.cumsum())
     peak = cum.cummax()
     dd = (cum - peak) / peak
     return dd.min()
 
-def sortino(returns):
-    downside = returns[returns < 0]
-    if downside.std() == 0:
+def sortino(returns, mar=0.0):
+    returns = pd.Series(returns)
+    downside_diff = np.minimum(0.0, returns - mar)
+    downside_dev = np.sqrt(np.mean(np.square(downside_diff)))
+    if downside_dev == 0:
         return 0
-    return returns.mean() / downside.std() * np.sqrt(252)
+    return (returns.mean() - mar) / downside_dev * np.sqrt(252)
 
-base['Signal'] = np.where(base['Pred'] > 0, 1, 0)
-cust['Signal'] = np.where(cust['Pred'] > 0, 1, 0)
+for market in ('NIFTY50', 'SP500'):
+    base = pd.read_csv(f'reports/baseline_{market}.csv')
+    cust = pd.read_csv(f'reports/custom_{market}.csv')
 
-base['Strategy'] = base['Signal'] * base['Actual']
-cust['Strategy'] = cust['Signal'] * cust['Actual']
+    base['Signal'] = np.where(base['Pred'] > 0, 1, 0)
+    cust['Signal'] = np.where(cust['Pred'] > 0, 1, 0)
+    base['Strategy'] = base['Signal'] * base['Actual']
+    cust['Strategy'] = cust['Signal'] * cust['Actual']
 
-print("="*50)
-print("RISK METRICS COMPARISON")
-print("="*50)
-print(f"Baseline MDD:      {mdd(base['Strategy']):.4f}")
-print(f"Custom MDD:        {mdd(cust['Strategy']):.4f}")
-print(f"Baseline Sortino:  {sortino(base['Strategy']):.4f}")
-print(f"Custom Sortino:    {sortino(cust['Strategy']):.4f}")
-print("="*50)
+    print("=" * 50)
+    print(f"RISK METRICS COMPARISON — {market}")
+    print("=" * 50)
+    print(f"Baseline MDD:      {mdd(base['Strategy']):.4f}")
+    print(f"Custom MDD:        {mdd(cust['Strategy']):.4f}")
+    print(f"Baseline Sortino:  {sortino(base['Strategy']):.4f}")
+    print(f"Custom Sortino:    {sortino(cust['Strategy']):.4f}")
+    print("=" * 50)
 
-plt.figure(figsize=(12,5))
-plt.plot((1+base['Strategy']).cumprod(), label='Baseline XGBoost (MSE)')
-plt.plot((1+cust['Strategy']).cumprod(), label='Custom AVP-Loss XGBoost')
-plt.legend()
-plt.title('Cumulative Returns: Baseline vs Custom AVP-Loss')
-plt.xlabel('Days')
-plt.ylabel('Cumulative Return')
-plt.grid(True, alpha=0.3)
-plt.savefig('reports/cumulative_returns.png')
-print("\nPlot saved to reports/cumulative_returns.png")
+    plt.figure(figsize=(12, 5))
+    plt.plot(np.exp(base['Strategy'].cumsum()), label='Baseline XGBoost (MSE)')
+    plt.plot(np.exp(cust['Strategy'].cumsum()), label='Custom AVP-Loss XGBoost')
+    plt.legend()
+    plt.title(f'Cumulative Returns: Baseline vs Custom AVP-Loss ({market})')
+    plt.xlabel('Days')
+    plt.ylabel('Cumulative Return')
+    plt.grid(True, alpha=0.3)
+    plt.savefig(f'reports/cumulative_returns_{market}.png')
+    plt.close()
+    print(f"\nPlot saved to reports/cumulative_returns_{market}.png")

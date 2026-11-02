@@ -1,17 +1,19 @@
-# System Architecture
+# QuantRisk AI — System Architecture
 
 ## High-Level Architecture
-Data Ingestion (yfinance) 
-↓
-Feature Engineering (Pandas/NumPy)
-↓
-Walk-Forward Validation Engine
-↓
-Custom AVP-Loss (XGBoost)
-↓
-FastAPI Backend (Caching layer)
-↓
-Streamlit Dashboard (Plotly)
+Data Ingestion (yfinance)
+        ↓
+Feature Engineering (Pandas/NumPy, past-only)
+        ↓
+Walk-Forward Validation + AVP-Loss (XGBoost)
+        ↓
+Report CSVs → SQLite (`quant_risk.db`)
+                    ↓
+             FastAPI + Pydantic
+                    ↓
+             Streamlit + Plotly
+                    ↑
+       Optional Gemini news sentiment
 
 ## Technology Stack
 - **Language:** Python 3.11
@@ -36,36 +38,21 @@ quant-risk/
 ├── app.py                 # Streamlit app
 ├── api.py                 # FastAPI endpoints
 └── requirements.txt
+```
 
-### 3. `docs/DESIGN.md`
-```markdown
-# Design System
+## API contract
 
-## Style
-Modern, Quantitative, Data-Dense
+- `GET /api/predict/{ticker}` returns the latest signal and risk metrics.
+- `GET /api/metrics/{ticker}` returns baseline/custom MDD, Sortino, Sharpe, and
+  improvement percentages.
+- `GET /api/predictions/{ticker}` returns dates, actual returns, and custom
+  predictions for charting.
 
-## Dashboard Layout
-1. **Header:** Ticker selection (NIFTY 50, S&P 500)
-2. **Main Panel:**
-   - Price Chart (Plotly Candlestick)
-   - Volatility Overlay (14-day rolling)
-3. **Risk Metrics Card:**
-   - Current Regime (Low/High Volatility)
-   - Model Signal (Buy/Neutral/Sell)
-   - Confidence Interval
-   - Maximum Drawdown
-4. **Warning Banner:** Displayed if Volatility > 35% or Confidence < 55%.
+The allow-listed tickers are `NIFTY50` and `SP500`. API responses are validated
+with Pydantic models before serialization.
 
-## Color Palette
-- Primary: #2962FF (Blue)
-- Success: #00C853 (Green)
-- Warning: #FF6D00 (Orange)
-- Danger: #D50000 (Red)
-- Background: #0E1117 (Dark, Streamlit default)
-- Text: #FAFAFA
+## Operational flow
 
-## UX Requirements
-- Interactive tooltips on charts.
-- Clear "Not Financial Advice" disclaimer in footer.
-- Responsive layout.
-- Loading spinners during model inference.
+After ML scripts regenerate reports, run `python scripts\init_db.py` to replace
+the SQLite report tables. Start the API with `uvicorn api:app --reload` and the
+dashboard with `streamlit run app.py`.

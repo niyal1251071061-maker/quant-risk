@@ -14,13 +14,18 @@ os.makedirs('reports', exist_ok=True)
 # ---------- Metrics ----------
 def mdd(r):
     r = pd.Series(r)
-    c = (1 + r).cumprod(); p = c.cummax()
-    return ((c - p) / p).min()
+    cum = np.exp(r.cumsum())
+    peak = cum.cummax()
+    dd = (cum - peak) / peak
+    return dd.min()
 
-def sortino(r):
+def sortino(r, mar=0.0):
     r = pd.Series(r)
-    d = r[r < 0]
-    return 0 if d.std() == 0 else r.mean() / d.std() * np.sqrt(252)
+    downside_diff = np.minimum(0.0, r - mar)
+    downside_dev = np.sqrt(np.mean(np.square(downside_diff)))
+    if downside_dev == 0:
+        return 0.0
+    return (r.mean() - mar) / downside_dev * np.sqrt(252)
 
 def rmse_fn(a, p):
     return np.sqrt(mean_squared_error(a, p))
@@ -36,16 +41,17 @@ def make_obj(lam, sigma_train):
 # ---------- Data preparation ----------
 def prepare_dataset(ticker, name):
     print(f"\nDownloading {name} ({ticker})...")
-    df = yf.download(ticker, start='2014-01-01', end='2024-01-01', progress=False)
+    df = yf.download(ticker, start='2014-01-01', end='2024-01-01',
+                     auto_adjust=False, multi_level_index=False, progress=False)
     if isinstance(df.columns, pd.MultiIndex):
         df.columns = df.columns.get_level_values(0)
     if 'Adj Close' in df.columns:
         df['Close'] = df['Adj Close']
 
-    df['Target'] = np.log(df['Close'] / df['Close'].shift(1)).shift(-1)
-    df['Volatility'] = df['Target'].rolling(14).std() * np.sqrt(252)
     df['Log_Return_1d'] = np.log(df['Close'] / df['Close'].shift(1))
     df['Log_Return_5d'] = np.log(df['Close'] / df['Close'].shift(5))
+    df['Volatility'] = df['Log_Return_1d'].rolling(14).std() * np.sqrt(252)
+    df['Target'] = df['Log_Return_1d'].shift(-1)
 
     delta = df['Close'].diff()
     gain = (delta.where(delta > 0, 0)).rolling(14).mean()

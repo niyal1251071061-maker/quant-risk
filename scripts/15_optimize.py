@@ -14,12 +14,18 @@ os.makedirs('reports/optimization_logs', exist_ok=True)
 
 # ---------------- Metrics ----------------
 def mdd(r):
-    c = (1 + r).cumprod(); p = c.cummax()
+    r = pd.Series(r)
+    c = np.exp(r.cumsum())
+    p = c.cummax()
     return ((c - p) / p).min()
 
-def sortino(r):
-    d = r[r < 0]
-    return 0 if d.std() == 0 else r.mean() / d.std() * np.sqrt(252)
+def sortino(r, mar=0.0):
+    r = pd.Series(r)
+    downside_diff = np.minimum(0.0, r - mar)
+    downside_dev = np.sqrt(np.mean(np.square(downside_diff)))
+    if downside_dev == 0:
+        return 0.0
+    return (r.mean() - mar) / downside_dev * np.sqrt(252)
 
 def rmse_fn(a, p):
     return np.sqrt(mean_squared_error(a, p))
@@ -43,12 +49,6 @@ LAMBDA_GRID  = [0.1, 0.25, 0.5, 0.75, 1.0, 2.0, 3.0, 5.0, 8.0, 10.0]
 LR_GRID      = [0.03, 0.05, 0.1]
 REG_GRID     = [0.5, 1.0, 2.0]
 
-# ---------------- Baseline reference per market ----------------
-BASELINES = {
-    'NIFTY50': {'rmse': 0.013218, 'mdd': -0.3183, 'sortino': 1.0415},
-    'SP500':   {'rmse': 0.015253, 'mdd': -0.3247, 'sortino': 0.2964},
-}
-
 # ---------------- Score ----------------
 # We want MDD -> 0 (maximize) AND Sortino -> +inf (maximize).
 # Normalize both against baseline and combine with weights.
@@ -62,8 +62,10 @@ def combined_score(mdd_val, sortino_val, baseline, w_mdd=0.7, w_sort=0.3):
 # ---------------- Evaluation ----------------
 def evaluate_config(df, depth, lam, lr, reg):
     preds, acts, dates = [], [], []
-    for i in range(train_window, len(df) - test_window, test_window):
+    for i in range(train_window, len(df), test_window):
         tr = df.iloc[:i]; te = df.iloc[i:i+test_window]
+        if len(te) < 20:
+            break
         tr_inner = tr.iloc[:-inner_val]
         val_inner = tr.iloc[-inner_val:]
 
@@ -100,16 +102,46 @@ def evaluate_config(df, depth, lam, lr, reg):
         'dates':   dates,
     }
 
+def prepare_features(name):
+    df = pd.read_parquet(f'data/{name}_features.parquet').copy()
+    df['Vol_Ratio'] = df['Volatility'] / df['Volatility'].rolling(60).mean()
+    df['Return_20d'] = np.log(df['Close'] / df['Close'].shift(20))
+    df['HL_Range'] = (df['High'] - df['Low']) / df['Close']
+    df['MA_Gap'] = (df['Close'] - df['Close'].rolling(20).mean()) / df['Close']
+    df.dropna(inplace=True)
+    return df
+
+def evaluate_baseline(df):
+    preds, acts = [], []
+    for i in range(train_window, len(df), test_window):
+        tr = df.iloc[:i]; te = df.iloc[i:i+test_window]
+        if len(te) < 20:
+            break
+        dtr = xgb.DMatrix(tr[features], label=tr['Target'])
+        dte = xgb.DMatrix(te[features])
+        bst = xgb.train(
+            {'max_depth': 4, 'learning_rate': 0.05, 'base_score': 0.0},
+            dtr, num_boost_round=100,
+        )
+        preds.extend(bst.predict(dte))
+        acts.extend(te['Target'].values)
+    result = pd.DataFrame({'Actual': acts, 'Pred': preds})
+    result['Strategy'] = (result['Pred'] > 0).astype(int) * result['Actual']
+    return {
+        'rmse': rmse_fn(result['Actual'], result['Pred']),
+        'mdd': mdd(result['Strategy']),
+        'sortino': sortino(result['Strategy']),
+    }
+
 # ---------------- Main search ----------------
 def search_market(name):
     print(f"\n{'='*80}")
     print(f"  FULL GRID SEARCH: {name}")
-    print(f"  Baseline: MDD={BASELINES[name]['mdd']:.4f} | Sortino={BASELINES[name]['sortino']:.4f}")
+    df = prepare_features(name)
+    baseline = evaluate_baseline(df)
+    print(f"  Baseline: MDD={baseline['mdd']:.4f} | Sortino={baseline['sortino']:.4f}")
     print(f"  Configs to test: {len(DEPTH_GRID)*len(LAMBDA_GRID)*len(LR_GRID)*len(REG_GRID)}")
     print(f"{'='*80}")
-
-    df = pd.read_parquet(f'data/{name}_features.parquet')
-    baseline = BASELINES[name]
 
     log_rows = []
     best = {'score': -np.inf}
@@ -133,7 +165,7 @@ def search_market(name):
         # Progress print
         elapsed = time.time() - start
         eta = (elapsed / count) * (total - count) if count < total else 0
-        print(f"[{count:>4}/{total}] d={depth} λ={lam:<4} lr={lr} reg={reg} | "
+        print(f"[{count:>4}/{total}] d={depth} lambda={lam:<4} lr={lr} reg={reg} | "
               f"RMSE={res['rmse']:.6f} MDD={res['mdd']:.4f} Sort={res['sortino']:.4f} | "
               f"score={score:+.3f} | ETA {eta/60:.1f}m")
 
@@ -142,6 +174,7 @@ def search_market(name):
                 'score': score,
                 'depth': depth, 'lambda': lam, 'lr': lr, 'reg': reg,
                 'rmse': res['rmse'], 'mdd': res['mdd'], 'sortino': res['sortino'],
+                'baseline': baseline,
                 'preds': res['preds'], 'acts': res['acts'], 'dates': res['dates'],
             }
 
@@ -181,6 +214,6 @@ if __name__ == '__main__':
     print(f"{'='*80}")
     print(f"{'Market':>10} | {'Baseline MDD':>13} | {'Optimal MDD':>13} | {'Baseline Sort':>14} | {'Optimal Sort':>13}")
     for m, best in results.items():
-        b = BASELINES[m]
+        b = best['baseline']
         print(f"{m:>10} | {b['mdd']:>13.4f} | {best['mdd']:>13.4f} | {b['sortino']:>14.4f} | {best['sortino']:>13.4f}")
     print(f"{'='*80}")
