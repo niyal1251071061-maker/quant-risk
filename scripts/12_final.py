@@ -12,8 +12,8 @@ features = ['Log_Return_1d', 'Log_Return_5d', 'RSI', 'Volatility',
 train_window, test_window, inner_val = 1260, 252, 126
 
 CONFIGS = {
-    'NIFTY50': {'depth': 6, 'lam': 2.0, 'lr': 0.05, 'reg': 1.0},
-    'SP500': {'depth': 4, 'lam': 0.1, 'lr': 0.1, 'reg': 0.5},
+    'NIFTY50': {'depth': 6, 'lam': 0.05, 'lr': 0.05, 'reg': 1.0},
+    'SP500': {'depth': 6, 'lam': 1.0, 'lr': 0.05, 'reg': 1.0},
 }
 
 
